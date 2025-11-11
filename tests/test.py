@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.chrome.service import Service
 import time
 
 class OpenBMCConfig:
@@ -32,8 +33,9 @@ class TestDriver:
         options.add_argument('--ignore-ssl-errors')
         options.add_argument('--window-size=1920,1080')
 
-        # ChromeDriver установлен через npm и доступен в PATH
-        self.driver = webdriver.Chrome(options=options)
+        # Явно указываем путь к ChromeDriver
+        service = Service('/usr/local/bin/chromedriver')
+        self.driver = webdriver.Chrome(service=service, options=options)
         self.driver.implicitly_wait(10)
         return self.driver
     
@@ -41,7 +43,7 @@ class TestDriver:
         if self.driver:
             self.driver.quit()
 
-# Остальной код БЕЗ ИЗМЕНЕНИЙ
+# Остальной код БЕЗ ИЗМЕНЕНИЙ...
 class BMCTestSuite:
     def __init__(self):
         self.config = OpenBMCConfig()
