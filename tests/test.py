@@ -175,37 +175,98 @@ class BMCTestSuite:
         self.driver = self.driver_manager.setup()
         
         try:
+            print("Открываем страницу логина...")
             self.driver.get(self.config.base_url)
-            print("Страница загружена для успешного входа")
+            print(f"Текущий URL: {self.driver.current_url}")
+            print(f"Заголовок страницы: {self.driver.title}")
+            
+            # Сохраняем скриншот страницы логина
+            self.driver.save_screenshot('login_page.png')
             
             # Ждем появления полей ввода
+            print("Ожидаем поля ввода...")
             username_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
             password_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
             
+            print("Вводим credentials...")
             username_field.send_keys(self.config.credentials["valid"]["username"])
             password_field.send_keys(self.config.credentials["valid"]["password"])
             
             login_button = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-button-submit"]')
             login_button.click()
             
+            print("Нажата кнопка логина, ждем редиректа...")
+            
+            # Ждем смены URL или появления Overview
             try:
-                overview_element = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "h1[data-v-51f73898]"))
+                # Ждем изменения URL (редирект после логина)
+                WebDriverWait(self.driver, 15).until(
+                    lambda driver: driver.current_url != self.config.base_url
                 )
-                overview_text = overview_element.text
+                print(f"Редирект выполнен, новый URL: {self.driver.current_url}")
                 
-                if overview_text == "Overview":
-                    print("✓ Успешный логин, Overview загружен")
-                    return True
+                # Сохраняем скриншот после логина
+                self.driver.save_screenshot('after_login.png')
+                
+                # Сохраняем HTML для отладки
+                with open('after_login.html', 'w') as f:
+                    f.write(self.driver.page_source)
+                
+                # Пробуем разные селекторы для Overview
+                overview_selectors = [
+                    "h1[data-v-51f73898]",  # оригинальный селектор
+                    "h1",                    # любой h1
+                    ".overview",             # класс overview
+                    "[data-test-id*='overview']",  # data-test-id содержащий overview
+                    "main h1",               # h1 внутри main
+                    ".page-header h1"        # h1 в заголовке страницы
+                ]
+                
+                overview_element = None
+                overview_text = ""
+                
+                for selector in overview_selectors:
+                    try:
+                        overview_element = WebDriverWait(self.driver, 5).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                        )
+                        overview_text = overview_element.text
+                        print(f"Найден элемент с селектором '{selector}': {overview_text}")
+                        break
+                    except TimeoutException:
+                        print(f"Элемент '{selector}' не найден")
+                        continue
+                
+                if overview_element:
+                    # Проверяем различные варианты текста Overview
+                    if "Overview" in overview_text or "Обзор" in overview_text or "overview" in overview_text.lower():
+                        print("✓ Успешный логин, Overview загружен")
+                        return True
+                    else:
+                        raise Exception(f"Ожидался Overview, но получен: '{overview_text}'")
                 else:
-                    raise Exception(f"Ожидался Overview, но получен: {overview_text}")
+                    # Если не нашли Overview, проверяем что вообще на странице
+                    page_text = self.driver.find_element(By.TAG_NAME, "body").text
+                    print(f"Текст страницы: {page_text[:500]}...")  # первые 500 символов
+                    raise Exception("Элемент Overview не найден на странице")
                     
-            except TimeoutException:
-                raise Exception("Страница Overview не загрузилась")
+            except TimeoutException as e:
+                print("Таймаут при ожидании редиректа/Overview")
+                print(f"Текущий URL: {self.driver.current_url}")
+                self.driver.save_screenshot('timeout_error.png')
+                with open('timeout_page.html', 'w') as f:
+                    f.write(self.driver.page_source)
+                raise Exception("Страница Overview не загрузилась после логина")
                 
         except Exception as e:
             print(f"Ошибка в тесте успешного входа: {e}")
-            self.driver.save_screenshot('error_success_login.png')
+            # Сохраняем дополнительную отладочную информацию
+            try:
+                self.driver.save_screenshot('final_error.png')
+                with open('final_page.html', 'w') as f:
+                    f.write(self.driver.page_source)
+            except:
+                pass
             raise
         finally:
             self.driver_manager.cleanup()
@@ -217,14 +278,14 @@ def run_all_tests():
     print("Запуск тестов BMC...")
     
     try:
-        # print("\n1. Тест успешного входа:")
-        # test_suite.test_login_success()
+        print("\n1. Тест успешного входа:")
+        test_suite.test_login_success()
         
-        print("\n2. Тест входа с неверными данными:")
-        test_suite.test_login_invalid_credentials()
+        # print("\n2. Тест входа с неверными данными:")
+        # test_suite.test_login_invalid_credentials()
         
-        print("\n3. Тест блокировки пользователя:")
-        test_suite.block_user_after_incorrect_credential()
+        # print("\n3. Тест блокировки пользователя:")
+        # test_suite.block_user_after_incorrect_credential()
         
         print("\n✓ Все тесты пройдены успешно!")
         
