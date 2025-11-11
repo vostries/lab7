@@ -37,9 +37,10 @@ pipeline {
                     sudo apt update
                     sudo apt install -y python3-pip qemu-system-arm curl wget net-tools gnupg unzip xvfb
                     
-                    # Install Chrome for WebUI tests
-                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google.list
+                    # Install Chrome for WebUI tests - modern approach without apt-key
+                    sudo mkdir -p /etc/apt/keyrings
+                    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
+                    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
                     sudo apt update
                     sudo apt install -y google-chrome-stable
                     
@@ -55,6 +56,8 @@ pipeline {
                     
                     # Install Python packages
                     sudo pip3 install requests pytest selenium locust urllib3
+                    
+                    echo "=== Environment setup completed ==="
                 '''
             }
         }
@@ -75,7 +78,11 @@ pipeline {
                       -drive file=romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd,format=raw,if=mtd \
                       -net nic -net user,hostfwd=tcp::2222-:22,hostfwd=tcp::2443-:443,hostfwd=udp::2623-:623,hostname=qemu &
                     
-                    echo "QEMU started, waiting for BMC to boot..."
+                    QEMU_PID=$!
+                    echo $QEMU_PID > qemu.pid
+                    echo "QEMU started with PID: $QEMU_PID"
+                    
+                    echo "Waiting for BMC to boot (90 seconds)..."
                     sleep 90
                     
                     # Test BMC connectivity
@@ -164,6 +171,11 @@ pipeline {
             echo "Build Status: ${currentBuild.currentResult}"
             
             sh '''
+                if [ -f qemu.pid ]; then
+                    echo "Stopping QEMU..."
+                    sudo kill $(cat qemu.pid) 2>/dev/null || true
+                    rm -f qemu.pid
+                fi
                 sudo pkill -f qemu-system-arm || true
                 sleep 2
             '''
@@ -174,7 +186,7 @@ pipeline {
             echo "ALL TESTS PASSED SUCCESSFULLY"
             sh '''
                 echo "Reports saved in 'reports/' directory:"
-                ls -la reports/ || true
+                ls -la reports/
             '''
         }
         failure {
