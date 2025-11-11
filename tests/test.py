@@ -36,10 +36,8 @@ class TestDriver:
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
 
-        # Указываем путь к ChromeDriver через environment variable
-        os.environ['webdriver.chrome.driver'] = '/usr/local/bin/chromedriver'
-        
-        # Простой вызов без Service
+        # ВАЖНО: Используем системный chromedriver для ARM
+        # Selenium автоматически найдет его через chromium-driver
         self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver
@@ -48,7 +46,6 @@ class TestDriver:
         if self.driver:
             self.driver.quit()
 
-# Остальной код без изменений...
 class BMCTestSuite:
     def __init__(self):
         self.config = OpenBMCConfig()

@@ -35,52 +35,57 @@ pipeline {
                 sh '''
                     echo "Installing dependencies..."
                     sudo apt update
-                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools unzip xvfb
+                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools unzip
                     
-                    # Install Chromium for ARM instead of Chrome
+                    # Install Chromium for ARM - ВАЖНО: используем системный chromedriver
                     sudo apt install -y chromium chromium-driver
                     
-                    # Create symlinks for compatibility with your tests
+                    # Create symlinks
                     sudo ln -sf /usr/bin/chromium /usr/bin/google-chrome
-                    sudo ln -sf /usr/bin/chromium-driver /usr/bin/chromedriver
                     
-                    # Install Python packages using apt (системные пакеты)
+                    # Install Python packages
                     sudo apt install -y python3-requests python3-pytest python3-selenium python3-locust python3-urllib3
                     
                     echo "=== Environment setup completed ==="
                     echo "Installed packages:"
                     which google-chrome && echo "Chrome (Chromium): ✅"
-                    which chromedriver && echo "ChromeDriver: ✅" || echo "ChromeDriver: ❌ NOT FOUND"
+                    which chromium-driver && echo "Chromium-Driver: ✅" || echo "Checking /usr/bin/chromium-driver"
+                    ls -la /usr/bin/chromium-driver && echo "System chromedriver: ✅"
                     which python3 && echo "Python3: ✅"
-                    which qemu-system-arm && echo "QEMU: ✅"
-                    python3 -c "import requests; print('Requests: ✅')"
-                    python3 -c "import pytest; print('Pytest: ✅')"
-                    python3 -c "import selenium; print('Selenium: ✅')"
-                    python3 -c "import locust; print('Locust: ✅')"
-                    
-                    # Если chromedriver не установился - установим вручную
-                    if ! which chromedriver > /dev/null; then
-                        echo "Installing ChromeDriver manually..."
-                        # Скачиваем правильную версию chromedriver
-                        CHROMIUM_VERSION=$(chromium --version | awk '{print $2}')
-                        echo "Chromium version: $CHROMIUM_VERSION"
-                        
-                        # Устанавливаем chromedriver через npm (альтернативный способ)
-                        sudo apt install -y npm
-                        sudo npm install -g chromedriver
-                        
-                        # Создаем симлинк в /usr/bin чтобы Selenium мог найти chromedriver
-                        sudo ln -sf /usr/local/bin/chromedriver /usr/bin/chromedriver
-                        
-                        # Проверяем установку
-                        which chromedriver && echo "ChromeDriver installed via npm: ✅"
-                        ls -la /usr/bin/chromedriver && echo "Symlink created: ✅"
-                    fi
-                    
-                    # Финальная проверка
-                    echo "=== Final ChromeDriver check ==="
-                    chromedriver --version && echo "ChromeDriver is working: ✅"
                 '''
+            }
+        }
+
+        stage('Run WebUI Tests') {
+            steps {
+                sh '''
+                    echo "Running WebUI Tests..."
+                    cd tests
+                    
+                    # Убедимся что используем системный chromedriver
+                    export CHROMEDRIVER_PATH="/usr/bin/chromium-driver"
+                    
+                    echo "=== ChromeDriver check ==="
+                    ls -la /usr/bin/chromium-driver && echo "System chromedriver exists: ✅"
+                    /usr/bin/chromium-driver --version && echo "System chromedriver works: ✅"
+                    
+                    echo "=== Starting WebUI tests ==="
+                    python3 test.py 2>&1 | tee ../reports/webui-test-output.log
+                    
+                    # Проверяем код возврата без Bad substitution
+                    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                        echo "WebUI tests passed"
+                        exit 0
+                    else
+                        echo "WebUI tests failed"
+                        exit 1
+                    fi
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/webui-test-output.log', fingerprint: true
+                }
             }
         }
         
