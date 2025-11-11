@@ -30,16 +30,17 @@ pipeline {
             steps {
                 sh '''
                     sudo apt update
-                    sudo apt install -y curl unzip xvfb libxi6 python3-pip
+                    sudo apt install -y curl unzip xvfb libxi6 python3-pip gnupg
 
-                    # Установка Google Chrome
-                    curl -sSL https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+                    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/google-linux-signing-keyring.gpg > /dev/null
+
+                    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+
                     sudo apt update
                     sudo apt install -y google-chrome-stable
 
-                    # Скачиваем ChromeDriver для версии Chrome
-                    CHROME_VERSION=$(google-chrome --version | grep -oP "\\d+\\.\\d+\\.\\d+")
+                    CHROME_VERSION=$(google-chrome --version | sed -E 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
                     wget -N https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip -P /tmp/
                     unzip -o /tmp/chromedriver_linux64.zip -d /tmp/
                     sudo mv -f /tmp/chromedriver /usr/local/bin/chromedriver
