@@ -39,7 +39,7 @@ pipeline {
                     sudo apt install -y google-chrome-stable
 
                     # Скачиваем ChromeDriver для версии Chrome
-                    CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+                    CHROME_VERSION=$(google-chrome --version | grep -oP "\\d+\\.\\d+\\.\\d+")
                     wget -N https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip -P /tmp/
                     unzip -o /tmp/chromedriver_linux64.zip -d /tmp/
                     sudo mv -f /tmp/chromedriver /usr/local/bin/chromedriver
