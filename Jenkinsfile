@@ -29,28 +29,26 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 sh '''
-                   sudo apt update
-                   sudo apt install -y curl unzip xvfb libxi6 libgconf-2-4 python3-pip
-                   
-                   # Установка Google Chrome
-                   curl -sSL https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-                   echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-                   sudo apt update
-                   sudo apt install -y google-chrome-stable
-                   
-                   # Получаем версию Chrome для подбора chromedriver
-                   CHROME_VERSION=$(google-chrome --version | grep -oP '\\d+\\.\\d+\\.\\d+')
-                   
-                   # Скачиваем подходящий chromedriver
-                   wget -N https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip -P /tmp/
-                   unzip -o /tmp/chromedriver_linux64.zip -d /tmp/
-                   sudo mv -f /tmp/chromedriver /usr/local/bin/chromedriver
-                   sudo chmod +x /usr/local/bin/chromedriver
-                   
-                   chromedriver --version
-                   google-chrome --version
-                   
-                   pip3 install selenium pytest requests locust
+                    sudo apt update
+                    sudo apt install -y curl unzip xvfb libxi6 python3-pip
+
+                    # Установка Google Chrome
+                    curl -sSL https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+                    sudo apt update
+                    sudo apt install -y google-chrome-stable
+
+                    # Скачиваем ChromeDriver для версии Chrome
+                    CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+                    wget -N https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip -P /tmp/
+                    unzip -o /tmp/chromedriver_linux64.zip -d /tmp/
+                    sudo mv -f /tmp/chromedriver /usr/local/bin/chromedriver
+                    sudo chmod +x /usr/local/bin/chromedriver
+
+                    chromedriver --version
+                    google-chrome --version
+
+                    pip3 install selenium pytest requests locust
                 '''
             }
         }
