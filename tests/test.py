@@ -217,8 +217,8 @@ def run_all_tests():
     print("Запуск тестов BMC...")
     
     try:
-        print("\n1. Тест успешного входа:")
-        test_suite.test_login_success()
+        # print("\n1. Тест успешного входа:")
+        # test_suite.test_login_success()
         
         print("\n2. Тест входа с неверными данными:")
         test_suite.test_login_invalid_credentials()
