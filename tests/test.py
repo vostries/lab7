@@ -3,20 +3,18 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.chrome.service import Service
 import time
-import os
 
 class OpenBMCConfig:
     def __init__(self):
         self.base_url = "https://localhost:2443"
         self.credentials = {
             "valid": {
-                "username": "root",
-                "password": "0penBmc"
+                "username": "vostrik",  # Используем ваши рабочие credentials
+                "password": "Lolkek123"
             },
             "invalid": {
-                "username": "root", 
+                "username": "vostrik",
                 "password": "wrongpass"
             }
         }
@@ -27,21 +25,18 @@ class TestDriver:
     
     def setup(self):
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
+        # Пока уберем headless для отладки
+        # options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--ignore-ssl-errors')
+        options.add_argument('--allow-insecure-localhost')
+        options.add_argument('--disable-web-security')
         options.add_argument('--window-size=1920,1080')
-        options.add_argument('--disable-gpu')
-        
-        # Использовать системный Chromium
-        options.binary_location = '/usr/bin/chromium'
-        
-        # Использовать системный ChromeDriver
-        service = Service('/usr/bin/chromedriver')
-        
-        self.driver = webdriver.Chrome(service=service, options=options)
+
+        # Используем системный chromedriver
+        self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver
     
@@ -58,6 +53,12 @@ class BMCTestSuite:
     def sleep(self, milliseconds):
         time.sleep(milliseconds / 1000)
     
+    def wait_for_element(self, by, selector, timeout=10):
+        """Ждать появления элемента"""
+        return WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located((by, selector))
+        )
+    
     def block_user_after_incorrect_credential(self):
         """Тест блокировки пользователя после нескольких неверных попыток входа"""
         self.driver = self.driver_manager.setup()
@@ -66,13 +67,16 @@ class BMCTestSuite:
             self.sleep(2000)
             
             self.driver.get(self.config.base_url)
+            print("Страница загружена")
+            
+            # Ждем появления полей ввода
+            username_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
+            password_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
             
             for i in range(4):
-                username_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
                 username_field.clear()
                 username_field.send_keys(self.config.credentials["invalid"]["username"])
                 
-                password_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
                 password_field.clear()
                 password_field.send_keys(self.config.credentials["invalid"]["password"])
                 
@@ -80,11 +84,9 @@ class BMCTestSuite:
                 login_button.click()
                 self.sleep(3000)
             
-            username_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
             username_field.clear()
             username_field.send_keys(self.config.credentials["valid"]["username"])
             
-            password_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
             password_field.clear()
             password_field.send_keys(self.config.credentials["valid"]["password"])
             
@@ -101,6 +103,11 @@ class BMCTestSuite:
             except NoSuchElementException:
                 raise Exception("Пользователь не был заблокирован")
                 
+        except Exception as e:
+            print(f"Ошибка в блокировке пользователя: {e}")
+            # Сделаем скриншот для отладки
+            self.driver.save_screenshot('error_block_user.png')
+            raise
         finally:
             self.driver_manager.cleanup()
     
@@ -110,11 +117,13 @@ class BMCTestSuite:
         
         try:
             self.driver.get(self.config.base_url)
+            print("Страница загружена для теста неверных данных")
             
-            username_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
+            # Ждем появления полей ввода
+            username_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
+            password_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
+            
             username_field.send_keys(self.config.credentials["invalid"]["username"])
-            
-            password_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
             password_field.send_keys(self.config.credentials["invalid"]["password"])
             
             login_button = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-button-submit"]')
@@ -130,6 +139,10 @@ class BMCTestSuite:
             except NoSuchElementException:
                 raise Exception("Ошибка при неверных пользовательских данных не была найдена")
                 
+        except Exception as e:
+            print(f"Ошибка в тесте неверных данных: {e}")
+            self.driver.save_screenshot('error_invalid_login.png')
+            raise
         finally:
             self.driver_manager.cleanup()
     
@@ -139,11 +152,13 @@ class BMCTestSuite:
         
         try:
             self.driver.get(self.config.base_url)
+            print("Страница загружена для успешного входа")
             
-            username_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
+            # Ждем появления полей ввода
+            username_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
+            password_field = self.wait_for_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
+            
             username_field.send_keys(self.config.credentials["valid"]["username"])
-            
-            password_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-password"]')
             password_field.send_keys(self.config.credentials["valid"]["password"])
             
             login_button = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-button-submit"]')
@@ -164,6 +179,10 @@ class BMCTestSuite:
             except TimeoutException:
                 raise Exception("Страница Overview не загрузилась")
                 
+        except Exception as e:
+            print(f"Ошибка в тесте успешного входа: {e}")
+            self.driver.save_screenshot('error_success_login.png')
+            raise
         finally:
             self.driver_manager.cleanup()
 
