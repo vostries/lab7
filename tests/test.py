@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.chrome.service import Service  # Импортируем здесь!
 import time
 import os
 
@@ -26,7 +27,7 @@ class TestDriver:
     
     def setup(self):
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')  # Для Jenkins
+        options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
@@ -37,7 +38,7 @@ class TestDriver:
         options.add_argument('--window-size=1920,1080')
 
         # Явно указываем путь к ChromeDriver
-        service = webdriver.ChromeService(executable_path='/usr/bin/chromedriver')
+        service = Service('/usr/local/bin/chromedriver')
         self.driver = webdriver.Chrome(service=service, options=options)
         self.driver.implicitly_wait(10)
         return self.driver
@@ -46,6 +47,7 @@ class TestDriver:
         if self.driver:
             self.driver.quit()
 
+# Остальной код без изменений...
 class BMCTestSuite:
     def __init__(self):
         self.config = OpenBMCConfig()

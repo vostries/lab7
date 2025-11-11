@@ -69,9 +69,17 @@ pipeline {
                         sudo apt install -y npm
                         sudo npm install -g chromedriver
                         
+                        # Создаем симлинк в /usr/bin чтобы Selenium мог найти chromedriver
+                        sudo ln -sf /usr/local/bin/chromedriver /usr/bin/chromedriver
+                        
                         # Проверяем установку
                         which chromedriver && echo "ChromeDriver installed via npm: ✅"
+                        ls -la /usr/bin/chromedriver && echo "Symlink created: ✅"
                     fi
+                    
+                    # Финальная проверка
+                    echo "=== Final ChromeDriver check ==="
+                    chromedriver --version && echo "ChromeDriver is working: ✅"
                 '''
             }
         }
@@ -136,11 +144,18 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
+                    # Добавляем /usr/local/bin в PATH чтобы найти chromedriver
+                    export PATH="/usr/local/bin:$PATH"
+                    
+                    # Проверяем что chromedriver теперь доступен
+                    echo "=== ChromeDriver check ==="
+                    which chromedriver && echo "ChromeDriver found: $(which chromedriver)"
+                    chromedriver --version && echo "ChromeDriver version: ✅"
+                    
                     # Clean up any existing Xvfb processes
                     pkill -f Xvfb || true
                     sleep 2
                     
-                    # Run WebUI tests without Xvfb (Chrome headless should work without it)
                     echo "=== Starting WebUI tests (headless) ==="
                     python3 test.py 2>&1 | tee ../reports/webui-test-output.log
                     TEST_EXIT_CODE=${PIPESTATUS[0]}
