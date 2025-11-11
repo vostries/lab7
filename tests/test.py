@@ -10,11 +10,11 @@ class OpenBMCConfig:
         self.base_url = "https://localhost:2443"
         self.credentials = {
             "valid": {
-                "username": "vostrik",
-                "password": "Lolkek123"
+                "username": "root",
+                "password": "0penBmc"
             },
             "invalid": {
-                "username": "vostrik",
+                "username": "root", 
                 "password": "wrongpass"
             }
         }
@@ -25,14 +25,14 @@ class TestDriver:
     
     def setup(self):
         options = webdriver.ChromeOptions()
-        #options.add_argument('--headless')
+        options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--ignore-ssl-errors')
-        options.add_argument('--allow-insecure-localhost')
-        options.add_argument('--disable-web-security')
+        options.add_argument('--window-size=1920,1080')
 
+        # Используем системный ChromeDriver
         self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver
@@ -41,6 +41,7 @@ class TestDriver:
         if self.driver:
             self.driver.quit()
 
+# Остальной код БЕЗ ИЗМЕНЕНИЙ
 class BMCTestSuite:
     def __init__(self):
         self.config = OpenBMCConfig()
@@ -184,8 +185,5 @@ def run_all_tests():
     return True
 
 if __name__ == "__main__":
-    # test_suite = BMCTestSuite()
-    # test_suite.test_login_success()
-    
     success = run_all_tests()
     exit(0 if success else 1)
