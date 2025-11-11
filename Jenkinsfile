@@ -55,39 +55,6 @@ pipeline {
                 '''
             }
         }
-
-        stage('Run WebUI Tests') {
-            steps {
-                sh '''
-                    echo "Running WebUI Tests..."
-                    cd tests
-                    
-                    # Убедимся что используем системный chromedriver
-                    export CHROMEDRIVER_PATH="/usr/bin/chromium-driver"
-                    
-                    echo "=== ChromeDriver check ==="
-                    ls -la /usr/bin/chromium-driver && echo "System chromedriver exists: ✅"
-                    /usr/bin/chromium-driver --version && echo "System chromedriver works: ✅"
-                    
-                    echo "=== Starting WebUI tests ==="
-                    python3 test.py 2>&1 | tee ../reports/webui-test-output.log
-                    
-                    # Проверяем код возврата без Bad substitution
-                    if [ ${PIPESTATUS[0]} -eq 0 ]; then
-                        echo "WebUI tests passed"
-                        exit 0
-                    else
-                        echo "WebUI tests failed"
-                        exit 1
-                    fi
-                '''
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'reports/webui-test-output.log', fingerprint: true
-                }
-            }
-        }
         
         stage('Start QEMU with OpenBMC') {
             steps {
@@ -149,23 +116,26 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
-                    # Добавляем /usr/local/bin в PATH чтобы найти chromedriver
-                    export PATH="/usr/local/bin:$PATH"
-                    
-                    # Проверяем что chromedriver теперь доступен
+                    # Убедимся что используем системный chromedriver
                     echo "=== ChromeDriver check ==="
-                    which chromedriver && echo "ChromeDriver found: $(which chromedriver)"
-                    chromedriver --version && echo "ChromeDriver version: ✅"
+                    ls -la /usr/bin/chromium-driver && echo "System chromedriver exists: ✅"
+                    /usr/bin/chromium-driver --version && echo "System chromedriver works: ✅"
                     
                     # Clean up any existing Xvfb processes
                     pkill -f Xvfb || true
                     sleep 2
                     
-                    echo "=== Starting WebUI tests (headless) ==="
+                    echo "=== Starting WebUI tests ==="
                     python3 test.py 2>&1 | tee ../reports/webui-test-output.log
-                    TEST_EXIT_CODE=${PIPESTATUS[0]}
                     
-                    exit $TEST_EXIT_CODE
+                    # Проверяем код возврата
+                    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                        echo "WebUI tests passed"
+                        exit 0
+                    else
+                        echo "WebUI tests failed"
+                        exit 1
+                    fi
                 '''
             }
             post {
