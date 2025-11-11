@@ -44,8 +44,12 @@ pipeline {
                     sudo ln -sf /usr/bin/chromium /usr/bin/google-chrome
                     sudo ln -sf /usr/bin/chromium-driver /usr/bin/chromedriver
                     
-                    # Install Python packages
-                    sudo pip3 install requests pytest selenium locust urllib3
+                    # Install Python packages using apt (системные пакеты)
+                    sudo apt install -y python3-requests python3-pytest python3-selenium python3-locust python3-urllib3
+                    
+                    # Дополнительно устанавливаем pipx для управления виртуальными окружениями
+                    sudo apt install -y pipx
+                    pipx ensurepath
                     
                     echo "=== Environment setup completed ==="
                     echo "Installed packages:"
@@ -53,6 +57,10 @@ pipeline {
                     which chromedriver && echo "ChromeDriver: ✅"
                     which python3 && echo "Python3: ✅"
                     which qemu-system-arm && echo "QEMU: ✅"
+                    python3 -c "import requests; print('Requests: ✅')"
+                    python3 -c "import pytest; print('Pytest: ✅')"
+                    python3 -c "import selenium; print('Selenium: ✅')"
+                    python3 -c "import locust; print('Locust: ✅')"
                 '''
             }
         }
@@ -161,7 +169,7 @@ EOF
                 sh '''
                     echo "Running Load Testing..."
                     cd tests
-                    locust -f locustfile.py --headless -u 5 -r 1 -t 30s --html=../reports/load-test-report.html
+                    python3 -m locust -f locustfile.py --headless -u 5 -r 1 -t 30s --html=../reports/load-test-report.html
                 '''
             }
             post {
