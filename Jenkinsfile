@@ -50,13 +50,28 @@ pipeline {
                     echo "=== Environment setup completed ==="
                     echo "Installed packages:"
                     which google-chrome && echo "Chrome (Chromium): ✅"
-                    which chromedriver && echo "ChromeDriver: ✅"
+                    which chromedriver && echo "ChromeDriver: ✅" || echo "ChromeDriver: ❌ NOT FOUND"
                     which python3 && echo "Python3: ✅"
                     which qemu-system-arm && echo "QEMU: ✅"
                     python3 -c "import requests; print('Requests: ✅')"
                     python3 -c "import pytest; print('Pytest: ✅')"
                     python3 -c "import selenium; print('Selenium: ✅')"
                     python3 -c "import locust; print('Locust: ✅')"
+                    
+                    # Если chromedriver не установился - установим вручную
+                    if ! which chromedriver > /dev/null; then
+                        echo "Installing ChromeDriver manually..."
+                        # Скачиваем правильную версию chromedriver
+                        CHROMIUM_VERSION=$(chromium --version | awk '{print $2}')
+                        echo "Chromium version: $CHROMIUM_VERSION"
+                        
+                        # Устанавливаем chromedriver через npm (альтернативный способ)
+                        sudo apt install -y npm
+                        sudo npm install -g chromedriver
+                        
+                        # Проверяем установку
+                        which chromedriver && echo "ChromeDriver installed via npm: ✅"
+                    fi
                 '''
             }
         }
