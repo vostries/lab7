@@ -35,11 +35,9 @@ pipeline {
                 sh '''
                     echo "Installing dependencies..."
                     sudo apt update
-                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools
-                    sudo pip3 install requests pytest selenium locust urllib3
+                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools gnupg unzip xvfb
                     
                     # Install Chrome for WebUI tests
-                    sudo apt install -y gnupg unzip
                     wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
                     echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google.list
                     sudo apt update
@@ -55,7 +53,8 @@ pipeline {
                     sudo mv chromedriver /usr/local/bin/
                     sudo chmod +x /usr/local/bin/chromedriver
                     
-                    echo "=== Dependencies installed successfully ==="
+                    # Install Python packages
+                    sudo pip3 install requests pytest selenium locust urllib3
                 '''
             }
         }
@@ -172,14 +171,14 @@ pipeline {
             archiveArtifacts artifacts: 'reports/**/*', fingerprint: true
         }
         success {
-            echo "✅ ALL TESTS PASSED SUCCESSFULLY"
+            echo "ALL TESTS PASSED SUCCESSFULLY"
             sh '''
-                echo "📊 Reports saved in 'reports/' directory:"
+                echo "Reports saved in 'reports/' directory:"
                 ls -la reports/ || true
             '''
         }
         failure {
-            echo "❌ TESTS FAILED"
+            echo "TESTS FAILED"
         }
     }
 }
