@@ -32,7 +32,7 @@ class TestDriver:
         options.add_argument('--ignore-ssl-errors')
         options.add_argument('--window-size=1920,1080')
 
-        # Используем системный ChromeDriver
+        # ChromeDriver установлен через npm и доступен в PATH
         self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver

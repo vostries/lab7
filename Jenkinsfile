@@ -36,7 +36,6 @@ pipeline {
                     which qemu-system-arm && echo "QEMU: ✅"
                     python3 -c "import selenium; print('Selenium: ✅')"
                     python3 -c "import pytest; print('Pytest: ✅')"
-                    python3 -c "import locust; print('Locust: ✅')"
                 '''
             }
         }
@@ -93,18 +92,12 @@ pipeline {
                 sh '''
                     echo "Running WebUI Tests..."
                     cd tests
-                    python3 test.py 2>&1 | tee ../reports/webui-test-output.log
-                    
-                    if [ $? -eq 0 ]; then
-                        echo "WebUI tests passed"
-                    else
-                        echo "WebUI tests failed"
-                        exit 1
-                    fi
+                    python3 test.py
                 '''
             }
             post {
                 always {
+                    sh 'cd tests && python3 test.py > ../reports/webui-test-output.log 2>&1 || true'
                     archiveArtifacts artifacts: 'reports/webui-test-output.log', fingerprint: true
                 }
             }
