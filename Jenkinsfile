@@ -30,12 +30,12 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Verifying Pre-installed Packages ==="
-                    which google-chrome && echo "Chrome: ✅"
-                    which chromedriver && echo "ChromeDriver: ✅"
-                    which python3 && echo "Python3: ✅"
-                    which qemu-system-arm && echo "QEMU: ✅"
-                    python3 -c "import selenium; print('Selenium: ✅')"
-                    python3 -c "import pytest; print('Pytest: ✅')"
+                    which google-chrome && echo "Chrome: ok"
+                    which chromedriver && echo "ChromeDriver: ok"
+                    which python3 && echo "Python3: ok"
+                    which qemu-system-arm && echo "QEMU: ok"
+                    python3 -c "import selenium; print('Selenium: ok')"
+                    python3 -c "import pytest; print('Pytest: ok')"
                 '''
             }
         }
@@ -61,10 +61,10 @@ pipeline {
                     echo "Testing BMC connectivity..."
                     for i in {1..10}; do
                         if curl -k https://localhost:2443/redfish/v1 2>/dev/null; then
-                            echo "✅ BMC is ready!"
+                            echo "BMC is ready!"
                             break
                         else
-                            echo "⏳ Attempt $i: Waiting..."
+                            echo "Attempt $i: Waiting..."
                             sleep 10
                         fi
                     done
