@@ -47,10 +47,6 @@ pipeline {
                     # Install Python packages using apt (системные пакеты)
                     sudo apt install -y python3-requests python3-pytest python3-selenium python3-locust python3-urllib3
                     
-                    # Дополнительно устанавливаем pipx для управления виртуальными окружениями
-                    sudo apt install -y pipx
-                    pipx ensurepath
-                    
                     echo "=== Environment setup completed ==="
                     echo "Installed packages:"
                     which google-chrome && echo "Chrome (Chromium): ✅"
@@ -125,26 +121,9 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
-                    # Update config for WebUI tests to use correct credentials
-                    cat > webui_config.py << 'EOF'
-class OpenBMCConfig:
-    def __init__(self):
-        self.base_url = "https://localhost:2443"
-        self.credentials = {
-            "valid": {
-                "username": "root",
-                "password": "0penBmc"
-            },
-            "invalid": {
-                "username": "root", 
-                "password": "wrongpass"
-            }
-        }
-EOF
-
                     # Set up virtual display
                     export DISPLAY=:99
-                    sudo Xvfb :99 -screen 0 1920x1080x24 &
+                    Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
                     
                     # Run WebUI tests
@@ -152,7 +131,7 @@ EOF
                     TEST_EXIT_CODE=${PIPESTATUS[0]}
                     
                     # Kill Xvfb
-                    sudo kill $XVFB_PID 2>/dev/null || true
+                    kill $XVFB_PID 2>/dev/null || true
                     
                     exit $TEST_EXIT_CODE
                 '''
