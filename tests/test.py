@@ -27,23 +27,41 @@ class TestDriver:
     
     def setup(self):
         options = webdriver.ChromeOptions()
-        # Пока без headless для отладки
-        # options.add_argument('--headless')
+        
+        # Обязательные опции для работы в контейнере
+        options.add_argument('--headless=new')  # Новый headless режим
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--ignore-ssl-errors')
-        options.add_argument('--allow-insecure-localhost')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--window-size=1920,1080')
-
-        # Явно указываем пути
-        options.binary_location = '/usr/bin/chromium'  # Путь к Chromium
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-software-rasterizer')
         
-        # Явно указываем путь к ChromeDriver
-        service = Service('/usr/bin/chromedriver')
+        # Для отладки можно добавить
+        options.add_argument('--verbose')
+        options.add_argument('--log-path=/tmp/chromedriver.log')
         
-        self.driver = webdriver.Chrome(service=service, options=options)
+        # Используем системный Chromium
+        options.binary_location = '/usr/bin/chromium'
+        
+        try:
+            # Пробуем с service
+            service = Service(
+                '/usr/bin/chromedriver',
+                service_args=['--verbose', '--log-path=/tmp/chromedriver.log']
+            )
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            print(f"Chrome with service failed: {e}")
+            # Fallback: пробуем без service
+            try:
+                self.driver = webdriver.Chrome(options=options)
+            except Exception as e2:
+                print(f"Chrome without service failed: {e2}")
+                raise
+        
         self.driver.implicitly_wait(10)
         return self.driver
     
