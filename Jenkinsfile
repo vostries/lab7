@@ -29,27 +29,18 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 sh '''
+                    echo "Installing dependencies..."
                     sudo apt update
-                    sudo apt install -y curl unzip xvfb libxi6 python3-pip gnupg
-
-                    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/google-linux-signing-keyring.gpg > /dev/null
-
-                    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-
-                    sudo apt update
-                    sudo apt install -y google-chrome-stable
-
-                    CHROME_VERSION=$(google-chrome --version | sed -E 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-
-                    wget -N https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip -P /tmp/
-                    unzip -o /tmp/chromedriver_linux64.zip -d /tmp/
-                    sudo mv -f /tmp/chromedriver /usr/local/bin/chromedriver
-                    sudo chmod +x /usr/local/bin/chromedriver
-
-                    chromedriver --version
-                    google-chrome --version
-
-                    pip3 install selenium pytest requests locust
+                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools
+                    
+                    # Install Python packages
+                    pip3 install requests pytest selenium locust urllib3 --break-system-packages
+                    
+                    # Install Chrome and ChromeDriver
+                    sudo apt install -y chromium chromium-driver
+                    sudo ln -sf /usr/bin/chromium /usr/bin/google-chrome
+                    
+                    echo "=== Environment setup completed ==="
                 '''
             }
         }
@@ -104,11 +95,18 @@ pipeline {
         stage('Run WebUI Tests') {
             steps {
                 sh '''
+                    echo "Running WebUI Tests..."
                     cd tests
+                    
+                    # Use webdriver-manager for automatic ChromeDriver management
+                    pip3 install webdriver-manager --break-system-packages
+                    
+                    # Run WebUI tests
                     python3 test.py 2>&1 | tee ../reports/webui-test-output.log
-                    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                    
+                    # Check exit code
+                    if [ $? -eq 0 ]; then
                         echo "WebUI tests passed"
-                        exit 0
                     else
                         echo "WebUI tests failed"
                         exit 1
