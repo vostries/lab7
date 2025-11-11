@@ -34,16 +34,16 @@ pipeline {
             steps {
                 sh '''
                     echo "Installing dependencies..."
-                    apt update
-                    apt install -y python3-pip qemu-system-arm curl wget net-tools
-                    pip3 install requests pytest selenium locust urllib3
+                    sudo apt update
+                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools
+                    sudo pip3 install requests pytest selenium locust urllib3
                     
                     # Install Chrome for WebUI tests
-                    apt install -y gnupg unzip
-                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
-                    apt update
-                    apt install -y google-chrome-stable
+                    sudo apt install -y gnupg unzip
+                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google.list
+                    sudo apt update
+                    sudo apt install -y google-chrome-stable
                     
                     # Install ChromeDriver
                     CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
@@ -52,8 +52,10 @@ pipeline {
                     CHROME_DRIVER_VERSION=$(cat LATEST_RELEASE_${CHROME_MAJOR})
                     wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
                     unzip chromedriver_linux64.zip
-                    mv chromedriver /usr/local/bin/
-                    chmod +x /usr/local/bin/chromedriver
+                    sudo mv chromedriver /usr/local/bin/
+                    sudo chmod +x /usr/local/bin/chromedriver
+                    
+                    echo "=== Dependencies installed successfully ==="
                 '''
             }
         }
@@ -63,14 +65,14 @@ pipeline {
                 sh '''
                     echo "Starting QEMU with OpenBMC..."
                     # Kill any existing QEMU processes
-                    pkill -f qemu-system-arm || true
+                    sudo pkill -f qemu-system-arm || true
                     sleep 2
                     
                     echo "Checking BMC image..."
                     ls -la romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd
                     
                     # Start QEMU with image from repository
-                    qemu-system-arm -m 256 -M romulus-bmc -nographic \
+                    sudo qemu-system-arm -m 256 -M romulus-bmc -nographic \
                       -drive file=romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd,format=raw,if=mtd \
                       -net nic -net user,hostfwd=tcp::2222-:22,hostfwd=tcp::2443-:443,hostfwd=udp::2623-:623,hostname=qemu &
                     
@@ -115,7 +117,7 @@ pipeline {
                     
                     # Set up virtual display
                     export DISPLAY=:99
-                    Xvfb :99 -screen 0 1920x1080x24 &
+                    sudo Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
                     
                     # Run WebUI tests
@@ -123,7 +125,7 @@ pipeline {
                     TEST_EXIT_CODE=${PIPESTATUS[0]}
                     
                     # Kill Xvfb
-                    kill $XVFB_PID 2>/dev/null || true
+                    sudo kill $XVFB_PID 2>/dev/null || true
                     
                     exit $TEST_EXIT_CODE
                 '''
@@ -163,21 +165,21 @@ pipeline {
             echo "Build Status: ${currentBuild.currentResult}"
             
             sh '''
-                pkill -f qemu-system-arm || true
+                sudo pkill -f qemu-system-arm || true
                 sleep 2
             '''
             
             archiveArtifacts artifacts: 'reports/**/*', fingerprint: true
         }
         success {
-            echo "ALL TESTS PASSED SUCCESSFULLY"
+            echo "✅ ALL TESTS PASSED SUCCESSFULLY"
             sh '''
-                echo "Reports saved in 'reports/' directory:"
+                echo "📊 Reports saved in 'reports/' directory:"
                 ls -la reports/ || true
             '''
         }
         failure {
-            echo "TESTS FAILED"
+            echo "❌ TESTS FAILED"
         }
     }
 }
