@@ -4,7 +4,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
-import os
 
 class OpenBMCConfig:
     def __init__(self):
@@ -15,7 +14,7 @@ class OpenBMCConfig:
                 "password": "0penBmc"
             },
             "invalid": {
-                "username": "root", 
+                "username": "root",
                 "password": "wrongpass"
             }
         }
@@ -33,8 +32,8 @@ class TestDriver:
         options.add_argument('--ignore-ssl-errors')
         options.add_argument('--window-size=1920,1080')
 
-        # Простой вызов - ChromeDriver автоматически найден через PATH
-        self.driver = webdriver.Chrome(options=options)
+        # Явно указываем путь к chromedriver
+        self.driver = webdriver.Chrome(executable_path='/usr/bin/chromedriver', options=options)
         self.driver.implicitly_wait(10)
         return self.driver
     
@@ -52,14 +51,11 @@ class BMCTestSuite:
         time.sleep(milliseconds / 1000)
     
     def block_user_after_incorrect_credential(self):
-        """Тест блокировки пользователя после нескольких неверных попыток входа"""
         self.driver = self.driver_manager.setup()
         
         try:
             self.sleep(2000)
-            
             self.driver.get(self.config.base_url)
-            
             for i in range(4):
                 username_field = self.driver.find_element(By.CSS_SELECTOR, '[data-test-id="login-input-username"]')
                 username_field.clear()
@@ -98,9 +94,7 @@ class BMCTestSuite:
             self.driver_manager.cleanup()
     
     def test_login_invalid_credentials(self):
-        """Тест входа с неверными учетными данными"""
         self.driver = self.driver_manager.setup()
-        
         try:
             self.driver.get(self.config.base_url)
             
@@ -127,9 +121,7 @@ class BMCTestSuite:
             self.driver_manager.cleanup()
     
     def test_login_success(self):
-        """Тест успешного входа в систему"""
         self.driver = self.driver_manager.setup()
-        
         try:
             self.driver.get(self.config.base_url)
             
@@ -161,27 +153,25 @@ class BMCTestSuite:
             self.driver_manager.cleanup()
 
 def run_all_tests():
-    """Запуск всех тестов"""
     test_suite = BMCTestSuite()
-    
     print("Запуск тестов BMC...")
-    
+
     try:
         print("\n1. Тест успешного входа:")
         test_suite.test_login_success()
-        
+
         print("\n2. Тест входа с неверными данными:")
         test_suite.test_login_invalid_credentials()
-        
+
         print("\n3. Тест блокировки пользователя:")
         test_suite.block_user_after_incorrect_credential()
-        
+
         print("\n✓ Все тесты пройдены успешно!")
-        
+
     except Exception as e:
         print(f"\n✗ Тест провален: {e}")
         return False
-    
+
     return True
 
 if __name__ == "__main__":
