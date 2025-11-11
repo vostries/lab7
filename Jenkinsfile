@@ -1,160 +1,147 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.9-slim'
-            args '--privileged -v /dev:/dev --network host'
-        }
-    }
+    agent any
     
-    environment {
-        BMC_IMAGE = '/var/jenkins_home/romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd'
-        BMC_IP = 'localhost'
-        BMC_PORT = '2443'
-        SSH_PORT = '2222'
+    options {
+        skipDefaultCheckout(true)
     }
     
     stages {
-        stage('Checkout Code') {
+        stage('Clean Workspace') {
             steps {
-                checkout scm
-                sh 'echo "Repository content:" && ls -la'
+                sh 'rm -rf * .git* reports || true'
+                sh 'mkdir -p reports'
+            }
+        }
+        
+        stage('Git Clone') {
+            steps {
+                sh '''
+                    git clone --depth 1 https://github.com/vostries/lab7.git tmp_repo
+                    mv tmp_repo/* .
+                    mv tmp_repo/.* . 2>/dev/null || true
+                    rm -rf tmp_repo
+                    echo "=== Repository Content ==="
+                    ls -la
+                    echo "=== Tests Directory ==="
+                    ls -la tests/
+                    echo "=== Romulus Directory ==="
+                    ls -la romulus/
+                '''
             }
         }
         
         stage('Setup Environment') {
             steps {
-                script {
-                    echo "Setting up testing environment..."
-                    sh '''
-                        apt update
-                        apt install -y qemu-system-arm python3-pip curl wget net-tools
-                        pip install requests pytest selenium locust urllib3 pytest-html
-                        
-                        # Install Chrome for WebUI tests
-                        apt install -y gnupg wget unzip
-                        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-                        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
-                        apt update
-                        apt install -y google-chrome-stable
-                        
-                        # Install ChromeDriver
-                        CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-                        CHROME_MAJOR=${CHROME_VERSION%%.*}
-                        wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}"
-                        CHROME_DRIVER_VERSION=$(cat LATEST_RELEASE_${CHROME_MAJOR})
-                        wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
-                        unzip chromedriver_linux64.zip
-                        mv chromedriver /usr/local/bin/
-                        chmod +x /usr/local/bin/chromedriver
-                        
-                        echo "=== Environment Setup Complete ==="
-                    '''
-                }
+                sh '''
+                    echo "Installing dependencies..."
+                    apt update
+                    apt install -y python3-pip qemu-system-arm curl wget net-tools
+                    pip3 install requests pytest selenium locust urllib3
+                    
+                    # Install Chrome for WebUI tests
+                    apt install -y gnupg unzip
+                    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+                    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+                    apt update
+                    apt install -y google-chrome-stable
+                    
+                    # Install ChromeDriver
+                    CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+                    CHROME_MAJOR=${CHROME_VERSION%%.*}
+                    wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}"
+                    CHROME_DRIVER_VERSION=$(cat LATEST_RELEASE_${CHROME_MAJOR})
+                    wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
+                    unzip chromedriver_linux64.zip
+                    mv chromedriver /usr/local/bin/
+                    chmod +x /usr/local/bin/chromedriver
+                '''
             }
         }
         
-        stage('Start OpenBMC in QEMU') {
+        stage('Start QEMU with OpenBMC') {
             steps {
-                script {
-                    echo "Starting OpenBMC in QEMU..."
-                    sh """
-                        # Kill any existing QEMU processes
-                        pkill -f qemu-system-arm || true
-                        sleep 2
-                        
-                        echo "BMC image path: ${env.BMC_IMAGE}"
-                        ls -la ${env.BMC_IMAGE} || echo "WARNING: BMC image might not be accessible"
-                        
-                        # Start QEMU with OpenBMC
-                        qemu-system-arm -m 256 -M romulus-bmc -nographic \\
-                          -drive file=${env.BMC_IMAGE},format=raw,if=mtd \\
-                          -net nic -net user,hostfwd=tcp::${env.SSH_PORT}-:22,hostfwd=tcp::${env.BMC_PORT}-:443,hostfwd=udp::2623-:623,hostname=qemu &
-                        
-                        QEMU_PID=\$!
-                        echo \$QEMU_PID > qemu.pid
-                        echo "QEMU started with PID: \$QEMU_PID"
-                        
-                        # Wait for BMC to boot
-                        echo "Waiting for BMC to start (90 seconds)..."
-                        sleep 90
-                        
-                        # Test BMC connectivity
-                        echo "Testing BMC connectivity..."
-                        for i in {1..12}; do
-                            if curl -k https://${env.BMC_IP}:${env.BMC_PORT}/redfish/v1 2>/dev/null; then
-                                echo "BMC is ready!"
-                                break
-                            else
-                                echo "Attempt \$i: BMC not ready, waiting 10 seconds..."
-                                sleep 10
-                            fi
-                        done
-                    """
-                }
+                sh '''
+                    echo "Starting QEMU with OpenBMC..."
+                    # Kill any existing QEMU processes
+                    pkill -f qemu-system-arm || true
+                    sleep 2
+                    
+                    echo "Checking BMC image..."
+                    ls -la romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd
+                    
+                    # Start QEMU with image from repository
+                    qemu-system-arm -m 256 -M romulus-bmc -nographic \
+                      -drive file=romulus/obmc-phosphor-image-romulus-20250903025632.static.mtd,format=raw,if=mtd \
+                      -net nic -net user,hostfwd=tcp::2222-:22,hostfwd=tcp::2443-:443,hostfwd=udp::2623-:623,hostname=qemu &
+                    
+                    echo "QEMU started, waiting for BMC to boot..."
+                    sleep 90
+                    
+                    # Test BMC connectivity
+                    echo "Testing BMC connectivity..."
+                    for i in {1..10}; do
+                        if curl -k https://localhost:2443/redfish/v1 2>/dev/null; then
+                            echo "✅ BMC is ready!"
+                            break
+                        else
+                            echo "⏳ Attempt $i: BMC not ready, waiting 10 seconds..."
+                            sleep 10
+                        fi
+                    done
+                '''
             }
         }
         
         stage('Run API Autotests') {
             steps {
-                script {
-                    echo "Running API autotests..."
-                    dir('tests') {
-                        sh '''
-                            # Просто запускаем тесты - все файлы уже есть в репозитории
-                            python -m pytest test_redfish.py -v --junitxml=../api-test-results.xml
-                        '''
-                    }
-                }
+                sh '''
+                    echo "Running API Autotests..."
+                    cd tests
+                    python3 -m pytest test_redfish.py -v --junitxml=../reports/api-test-results.xml
+                '''
             }
             post {
                 always {
-                    junit 'api-test-results.xml'
-                    archiveArtifacts artifacts: 'api-test-results.xml', fingerprint: true
+                    junit 'reports/api-test-results.xml'
                 }
             }
         }
         
         stage('Run WebUI Tests') {
             steps {
-                script {
-                    echo "Running WebUI tests..."
-                    dir('tests') {
-                        sh '''
-                            # Set up virtual display for Chrome
-                            export DISPLAY=:99
-                            Xvfb :99 -screen 0 1920x1080x24 &
-                            XVFB_PID=$!
-                            
-                            # Просто запускаем WebUI тесты - все файлы уже есть
-                            python test.py 2>&1 | tee ../webui-test-output.log
-                            TEST_EXIT_CODE=${PIPESTATUS[0]}
-                            
-                            # Kill Xvfb
-                            kill $XVFB_PID 2>/dev/null || true
-                            
-                            exit $TEST_EXIT_CODE
-                        '''
-                    }
-                }
+                sh '''
+                    echo "Running WebUI Tests..."
+                    cd tests
+                    
+                    # Set up virtual display
+                    export DISPLAY=:99
+                    Xvfb :99 -screen 0 1920x1080x24 &
+                    XVFB_PID=$!
+                    
+                    # Run WebUI tests
+                    python3 test.py 2>&1 | tee ../reports/webui-test-output.log
+                    TEST_EXIT_CODE=${PIPESTATUS[0]}
+                    
+                    # Kill Xvfb
+                    kill $XVFB_PID 2>/dev/null || true
+                    
+                    exit $TEST_EXIT_CODE
+                '''
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'webui-test-output.log', fingerprint: true
+                    archiveArtifacts artifacts: 'reports/webui-test-output.log', fingerprint: true
                 }
             }
         }
         
         stage('Run Load Testing') {
             steps {
-                script {
-                    echo "Running load tests with Locust..."
-                    dir('tests') {
-                        sh '''
-                            # Просто запускаем нагрузочное тестирование - locustfile.py уже есть
-                            locust -f locustfile.py --headless -u 5 -r 1 -t 30s --html=../load-test-report.html
-                        '''
-                    }
-                }
+                sh '''
+                    echo "Running Load Testing..."
+                    cd tests
+                    locust -f locustfile.py --headless -u 5 -r 1 -t 30s --html=../reports/load-test-report.html
+                '''
             }
             post {
                 always {
@@ -162,7 +149,7 @@ pipeline {
                         allowMissing: true,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
-                        reportDir: '.',
+                        reportDir: 'reports',
                         reportFiles: 'load-test-report.html',
                         reportName: 'Load Test Report'
                     ])
@@ -173,39 +160,24 @@ pipeline {
     
     post {
         always {
-            script {
-                echo "Cleaning up..."
-                sh '''
-                    # Stop QEMU
-                    if [ -f qemu.pid ]; then
-                        echo "Stopping QEMU..."
-                        kill $(cat qemu.pid) 2>/dev/null || true
-                        sleep 5
-                        rm -f qemu.pid
-                    fi
-                    
-                    # Clean up any remaining processes
-                    pkill -f qemu-system-arm || true
-                    pkill -f Xvfb || true
-                '''
-            }
+            echo "Build Status: ${currentBuild.currentResult}"
             
-            // Archive all test results
-            archiveArtifacts artifacts: '**/*.xml, **/*.log, **/*.html', fingerprint: true
+            sh '''
+                pkill -f qemu-system-arm || true
+                sleep 2
+            '''
             
-            // Clean workspace
-            cleanWs()
+            archiveArtifacts artifacts: 'reports/**/*', fingerprint: true
         }
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "ALL TESTS PASSED SUCCESSFULLY"
+            sh '''
+                echo "Reports saved in 'reports/' directory:"
+                ls -la reports/ || true
+            '''
         }
         failure {
-            echo "❌ Pipeline failed!"
+            echo "TESTS FAILED"
         }
-    }
-    
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '5'))
     }
 }
