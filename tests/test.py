@@ -3,18 +3,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.chrome.service import Service
 import time
+import os
 
 class OpenBMCConfig:
     def __init__(self):
         self.base_url = "https://localhost:2443"
         self.credentials = {
             "valid": {
-                "username": "vostrik",  # Используем ваши рабочие credentials
+                "username": "vostrik",
                 "password": "Lolkek123"
             },
             "invalid": {
-                "username": "vostrik",
+                "username": "vostrik", 
                 "password": "wrongpass"
             }
         }
@@ -25,7 +27,7 @@ class TestDriver:
     
     def setup(self):
         options = webdriver.ChromeOptions()
-        # Пока уберем headless для отладки
+        # Пока без headless для отладки
         # options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
@@ -35,8 +37,13 @@ class TestDriver:
         options.add_argument('--disable-web-security')
         options.add_argument('--window-size=1920,1080')
 
-        # Используем системный chromedriver
-        self.driver = webdriver.Chrome(options=options)
+        # Явно указываем пути
+        options.binary_location = '/usr/bin/chromium'  # Путь к Chromium
+        
+        # Явно указываем путь к ChromeDriver
+        service = Service('/usr/bin/chromedriver')
+        
+        self.driver = webdriver.Chrome(service=service, options=options)
         self.driver.implicitly_wait(10)
         return self.driver
     
@@ -105,7 +112,6 @@ class BMCTestSuite:
                 
         except Exception as e:
             print(f"Ошибка в блокировке пользователя: {e}")
-            # Сделаем скриншот для отладки
             self.driver.save_screenshot('error_block_user.png')
             raise
         finally:
