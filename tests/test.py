@@ -31,13 +31,9 @@ class TestDriver:
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--ignore-ssl-errors')
-        options.add_argument('--allow-insecure-localhost')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
 
-        # ВАЖНО: Используем системный chromedriver для ARM
-        # Selenium автоматически найдет его через chromium-driver
+        # Простой вызов - ChromeDriver автоматически найден через PATH
         self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver

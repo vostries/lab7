@@ -37,11 +37,24 @@ pipeline {
                     sudo apt update
                     sudo apt install -y python3-pip qemu-system-arm curl wget net-tools unzip
                     
-                    # Install Chromium for ARM - ВАЖНО: используем системный chromedriver
-                    sudo apt install -y chromium chromium-driver
-                    
-                    # Create symlinks
+                    # Install Chromium
+                    sudo apt install -y chromium
                     sudo ln -sf /usr/bin/chromium /usr/bin/google-chrome
+                    
+                    # Install ChromeDriver manually
+                    echo "Installing ChromeDriver..."
+                    CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+                    CHROME_MAJOR=${CHROME_VERSION%%.*}
+                    echo "Chrome version: $CHROME_VERSION"
+                    
+                    # Download and install ChromeDriver
+                    wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR"
+                    CHROME_DRIVER_VERSION=$(cat LATEST_RELEASE_$CHROME_MAJOR)
+                    wget -q "https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip"
+                    unzip chromedriver_linux64.zip
+                    sudo mv chromedriver /usr/local/bin/
+                    sudo chmod +x /usr/local/bin/chromedriver
+                    rm -f LATEST_RELEASE_* chromedriver_linux64.zip
                     
                     # Install Python packages
                     sudo apt install -y python3-requests python3-pytest python3-selenium python3-locust python3-urllib3
@@ -49,9 +62,8 @@ pipeline {
                     echo "=== Environment setup completed ==="
                     echo "Installed packages:"
                     which google-chrome && echo "Chrome (Chromium): ✅"
-                    which chromium-driver && echo "Chromium-Driver: ✅" || echo "Checking /usr/bin/chromium-driver"
-                    ls -la /usr/bin/chromium-driver && echo "System chromedriver: ✅"
-                    which python3 && echo "Python3: ✅"
+                    which chromedriver && echo "ChromeDriver: ✅"
+                    python3 -c "import selenium; print('Selenium: ✅')"
                 '''
             }
         }
@@ -116,26 +128,20 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
-                    # Убедимся что используем системный chromedriver
                     echo "=== ChromeDriver check ==="
-                    ls -la /usr/bin/chromium-driver && echo "System chromedriver exists: ✅"
-                    /usr/bin/chromium-driver --version && echo "System chromedriver works: ✅"
-                    
-                    # Clean up any existing Xvfb processes
-                    pkill -f Xvfb || true
-                    sleep 2
+                    which chromedriver && echo "ChromeDriver: ✅ ($(chromedriver --version))"
                     
                     echo "=== Starting WebUI tests ==="
                     python3 test.py 2>&1 | tee ../reports/webui-test-output.log
                     
-                    # Проверяем код возврата
-                    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                    # Simple exit code check
+                    result=$?
+                    if [ $result -eq 0 ]; then
                         echo "WebUI tests passed"
-                        exit 0
                     else
                         echo "WebUI tests failed"
-                        exit 1
                     fi
+                    exit $result
                 '''
             }
             post {
