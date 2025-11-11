@@ -35,29 +35,24 @@ pipeline {
                 sh '''
                     echo "Installing dependencies..."
                     sudo apt update
-                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools gnupg unzip xvfb
+                    sudo apt install -y python3-pip qemu-system-arm curl wget net-tools unzip xvfb
                     
-                    # Install Chrome for WebUI tests - modern approach without apt-key
-                    sudo mkdir -p /etc/apt/keyrings
-                    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
-                    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-                    sudo apt update
-                    sudo apt install -y google-chrome-stable
+                    # Install Chromium for ARM instead of Chrome
+                    sudo apt install -y chromium chromium-driver
                     
-                    # Install ChromeDriver
-                    CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-                    CHROME_MAJOR=${CHROME_VERSION%%.*}
-                    wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}"
-                    CHROME_DRIVER_VERSION=$(cat LATEST_RELEASE_${CHROME_MAJOR})
-                    wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
-                    unzip chromedriver_linux64.zip
-                    sudo mv chromedriver /usr/local/bin/
-                    sudo chmod +x /usr/local/bin/chromedriver
+                    # Create symlinks for compatibility with your tests
+                    sudo ln -sf /usr/bin/chromium /usr/bin/google-chrome
+                    sudo ln -sf /usr/bin/chromium-driver /usr/bin/chromedriver
                     
                     # Install Python packages
                     sudo pip3 install requests pytest selenium locust urllib3
                     
                     echo "=== Environment setup completed ==="
+                    echo "Installed packages:"
+                    which google-chrome && echo "Chrome (Chromium): ✅"
+                    which chromedriver && echo "ChromeDriver: ✅"
+                    which python3 && echo "Python3: ✅"
+                    which qemu-system-arm && echo "QEMU: ✅"
                 '''
             }
         }
@@ -111,6 +106,7 @@ pipeline {
             post {
                 always {
                     junit 'reports/api-test-results.xml'
+                    archiveArtifacts artifacts: 'reports/api-test-results.xml', fingerprint: true
                 }
             }
         }
@@ -121,6 +117,23 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
+                    # Update config for WebUI tests to use correct credentials
+                    cat > webui_config.py << 'EOF'
+class OpenBMCConfig:
+    def __init__(self):
+        self.base_url = "https://localhost:2443"
+        self.credentials = {
+            "valid": {
+                "username": "root",
+                "password": "0penBmc"
+            },
+            "invalid": {
+                "username": "root", 
+                "password": "wrongpass"
+            }
+        }
+EOF
+
                     # Set up virtual display
                     export DISPLAY=:99
                     sudo Xvfb :99 -screen 0 1920x1080x24 &
