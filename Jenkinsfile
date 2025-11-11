@@ -121,17 +121,14 @@ pipeline {
                     echo "Running WebUI Tests..."
                     cd tests
                     
-                    # Set up virtual display
-                    export DISPLAY=:99
-                    Xvfb :99 -screen 0 1920x1080x24 &
-                    XVFB_PID=$!
+                    # Clean up any existing Xvfb processes
+                    pkill -f Xvfb || true
+                    sleep 2
                     
-                    # Run WebUI tests
+                    # Run WebUI tests without Xvfb (Chrome headless should work without it)
+                    echo "=== Starting WebUI tests (headless) ==="
                     python3 test.py 2>&1 | tee ../reports/webui-test-output.log
                     TEST_EXIT_CODE=${PIPESTATUS[0]}
-                    
-                    # Kill Xvfb
-                    kill $XVFB_PID 2>/dev/null || true
                     
                     exit $TEST_EXIT_CODE
                 '''
