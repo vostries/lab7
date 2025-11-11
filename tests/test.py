@@ -3,7 +3,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.chrome.service import Service  # Импортируем здесь!
 import time
 import os
 
@@ -37,9 +36,11 @@ class TestDriver:
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
 
-        # Явно указываем путь к ChromeDriver
-        service = Service('/usr/local/bin/chromedriver')
-        self.driver = webdriver.Chrome(service=service, options=options)
+        # Указываем путь к ChromeDriver через environment variable
+        os.environ['webdriver.chrome.driver'] = '/usr/local/bin/chromedriver'
+        
+        # Простой вызов без Service
+        self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
         return self.driver
     
